@@ -309,6 +309,10 @@ do
                         return ${PIPESTATUS[0]}
                     }
 
+                    # Define a negating operator which triggers the error trap of the shell. The
+                    # builtin ! will not.
+                    function expectfail () { ! "$@"; }
+
                     # Set `-xe` before the test in the subshell.  We want the
                     # test to fail fast to allow for more accurate output of
                     # where things went wrong but not in _our_ process because a
