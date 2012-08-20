@@ -302,7 +302,11 @@ do
                     #   capture ls asdf
                     #   grep "error" stderr
                     capture () {
-                        { "$@" 2>&1 1>&3 | tee -- stderr 1>&2; } 3>&1 | tee -- stdout
+                        { 
+                            "$@" 2>&1 1>&3 | tee -- stderr | awk "{ print \"\033[31m\"\$0\"\033[m\"; }" 1>&2 
+                            return ${PIPESTATUS[0]}; 
+                        } 3>&1 | tee -- stdout
+                        return ${PIPESTATUS[0]}
                     }
 
                     # Set `-xe` before the test in the subshell.  We want the
