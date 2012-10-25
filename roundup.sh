@@ -302,12 +302,16 @@ do
                     #   capture ls asdf
                     #   grep "error" stderr
                     capture () {
-                        { 
-                            "$@" 2>&1 1>&3 | tee -- stderr | awk "{ print \"\033[31m\"\$0\"\033[m\"; }" 1>&2 
-                            return ${PIPESTATUS[0]}; 
-                        } 3>&1 | tee -- stdout
+                        {
+                            "$@" 2>&1 1>&3 | tee -- $roundup_tmp/stderr | awk "{ print \"\033[31m\"\$0\"\033[m\"; }" 1>&2
+                            return ${PIPESTATUS[0]};
+                        } 3>&1 | tee -- $roundup_tmp/stdout
                         return ${PIPESTATUS[0]}
                     }
+
+		    stdout () { echo -n "$roundup_tmp/stdout"; }
+		    stderr () { echo -n "$roundup_tmp/stderr"; }
+
 
                     # Define a negating operator which triggers the error trap of the shell. The
                     # builtin ! will not.
@@ -351,7 +355,7 @@ do
             then printf "s"
             else printf "f"
             fi
-            
+
             printf " $roundup_test_name\n"
         done
     )
