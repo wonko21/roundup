@@ -231,7 +231,7 @@ run()
         set -E
         trap 'rc=$?; set +x; set -o | grep "errexit.*on" >/dev/null && exit $rc' ERR
 
-	run_with_tracing "$func"
+        run_with_tracing "$func"
     )
 
     # copy roundup_result from subshell above
@@ -315,10 +315,10 @@ do
         printf "d %s" "$roundup_desc" | tr "\n" " "
         printf "\n"
 
-	# Run `init` function of the current plan. THis will be done before any of
-	# the tests in the plan are executed.
+        # Run `init` function of the current plan. THis will be done before any of
+        # the tests in the plan are executed.
         # If `init` wasn't redefined, then this is `:`.
-	run "init"
+        run "init"
 
         for roundup_test_name in $roundup_plan
         do
@@ -334,10 +334,10 @@ do
                 # But, only do this if the error handling is activated.
                 set -E
                 trap 'rc=$?; set +x; set -o | grep "errexit.*on" >/dev/null && exit $rc' ERR
-		trap "cleanup" INT
+                trap "cleanup" INT
 
                 # If `before` wasn't redefined, then this is `:`.
-		run_with_tracing before "$roundup_tmp/$roundup_test_name"
+                run_with_tracing before "$roundup_tmp/$roundup_test_name"
 
                 # Momentarily turn off auto-fail to give us access to the tests
                 # exit status in `$?` for capturing.
@@ -355,8 +355,8 @@ do
                         return ${PIPESTATUS[0]}
                     }
 
-		    stdout () { echo -n "$roundup_tmp/stdout"; }
-		    stderr () { echo -n "$roundup_tmp/stderr"; }
+                    stdout () { echo -n "$roundup_tmp/stdout"; }
+                    stderr () { echo -n "$roundup_tmp/stderr"; }
 
 
                     # Define a negating operator which triggers the error trap of the shell. The
@@ -403,10 +403,10 @@ do
             printf " $roundup_test_name\n"
         done
 
-	# Run `cleanup` function of the current plan.
-	# This function is guaranteed to run after the last test case.
+        # Run `cleanup` function of the current plan.
+        # This function is guaranteed to run after the last test case.
         # If `cleanup` wasn't redefined, then this is `:`.
-	run "cleanup"
+        run "cleanup"
     )
 done |
 
