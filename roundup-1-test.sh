@@ -58,7 +58,7 @@ it_exits_non_zero_on_broken_init() {
 }
 
 it_exits_non_zero_on_broken_cleanup() {
-    status=$(set +e ; rup roundup-init >/dev/null ; echo $?)
+    status=$(set +e ; rup roundup-cleanup >/dev/null ; echo $?)
     test 2 -eq $status
 }
 
