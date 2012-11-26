@@ -51,3 +51,18 @@ it_exits_non_zero_on_broken_before () {
     status=$(set +e ; rup roundup-5 >/dev/null ; echo $?)
     test 2 -eq $status
 }
+
+it_exits_non_zero_on_broken_init() {
+    status=$(set +e ; rup roundup-init >/dev/null ; echo $?)
+    test 2 -eq $status
+}
+
+it_exits_non_zero_on_broken_cleanup() {
+    status=$(set +e ; rup roundup-init >/dev/null ; echo $?)
+    test 2 -eq $status
+}
+
+it_passes_if_init_before_test_after_cleanup_pass() {
+    status=$(set +e ; rup roundup-succeeds >/dev/null ; echo $?)
+    test 0 -eq $status
+}
