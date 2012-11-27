@@ -195,6 +195,56 @@ roundup_summarize() {
     test $failed -eq 0 || exit 2
 }
 
+
+run_with_tracing()
+{
+    local func="$1"
+    local tracefile="${2:-$roundup_tmp/$func}"
+
+    # Output `$func` trace to temporary file.
+    {
+        # redirect tracing output of `$func` into file.
+        {
+            set -xe
+            $func
+        } &>"$tracefile"
+
+         # disable tracing again. Its trace output goes to /dev/null.
+        set +x
+    } &>/dev/null
+}
+
+run()
+{
+    local func="$1"
+
+    # Any number of things are possible in `$func`.
+    # Drop into an subshell to contain operations that may throw
+    # off `$func`; such as `cd`.
+    # Momentarily turn off auto-fail to give us access to the exit status
+    # in `$?` for capturing.
+    set +e
+    (
+        # exit subshell with return code of last failing command. This
+        # is needed to see the return code 253 on failed assumptions.
+        # But, only do this if the error handling is activated.
+        set -E
+        trap 'rc=$?; set +x; set -o | grep "errexit.*on" >/dev/null && exit $rc' ERR
+
+        run_with_tracing "$func"
+    )
+
+    # copy roundup_result from subshell above
+    roundup_result=$?
+
+    # Check if `$func` was successful, otherwise emit fail signal
+    if [ "$roundup_result" != 0 ]; then
+        # `$func` failed
+        printf "f $func\n"; continue
+    fi
+}
+
+
 # Sandbox Test Runs
 # -----------------
 
@@ -241,8 +291,10 @@ do
 
         # Provide default `before` and `after` functions that run only `:`, a
         # no-op. They may or may not be redefined by the test plan.
+        init() { :; }
         before() { :; }
         after() { :; }
+        cleanup() { :; }
 
         # Seek test methods and aggregate their names, forming a test plan.
         # This is done before populating the sandbox with tests to avoid odd
@@ -263,6 +315,11 @@ do
         printf "d %s" "$roundup_desc" | tr "\n" " "
         printf "\n"
 
+        # Run `init` function of the current plan. THis will be done before any of
+        # the tests in the plan are executed.
+        # If `init` wasn't redefined, then this is `:`.
+        run "init"
+
         for roundup_test_name in $roundup_plan
         do
             # Any number of things are possible in `before`, `after`, and the
@@ -277,19 +334,10 @@ do
                 # But, only do this if the error handling is activated.
                 set -E
                 trap 'rc=$?; set +x; set -o | grep "errexit.*on" >/dev/null && exit $rc' ERR
+                trap "cleanup" INT
 
-                # Output `before` trace to temporary file. If `before` runs cleanly,
-                # the trace will be overwritten by the actual test case below.
-                {
-                    # redirect tracing output of `before` into file.
-                    {
-                        set -xe
-                        # If `before` wasn't redefined, then this is `:`.
-                        before
-                    } &>"$roundup_tmp/$roundup_test_name"
-                    # disable tracing again. Its trace output goes to /dev/null.
-                    set +x
-                } &>/dev/null
+                # If `before` wasn't redefined, then this is `:`.
+                run_with_tracing before "$roundup_tmp/$roundup_test_name"
 
                 # Momentarily turn off auto-fail to give us access to the tests
                 # exit status in `$?` for capturing.
@@ -307,8 +355,8 @@ do
                         return ${PIPESTATUS[0]}
                     }
 
-		    stdout () { echo -n "$roundup_tmp/stdout"; }
-		    stderr () { echo -n "$roundup_tmp/stderr"; }
+                    stdout () { echo -n "$roundup_tmp/stdout"; }
+                    stderr () { echo -n "$roundup_tmp/stderr"; }
 
 
                     # Define a negating operator which triggers the error trap of the shell. The
@@ -345,8 +393,6 @@ do
 
             # This is the final step of a test.  Print its pass/fail signal
             # and name.
-            # This is the final step of a test.  Print its pass/fail signal
-            # and name.
             if [ "$roundup_result" == 0 ]
             then printf "p"; eval export passed_$roundup_test_name=1
             elif [ "$roundup_result" == 253 ]
@@ -356,6 +402,11 @@ do
 
             printf " $roundup_test_name\n"
         done
+
+        # Run `cleanup` function of the current plan.
+        # This function is guaranteed to run after the last test case.
+        # If `cleanup` wasn't redefined, then this is `:`.
+        run "cleanup"
     )
 done |
 
