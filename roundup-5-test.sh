@@ -127,3 +127,7 @@ it_is_skipped_without_assumptions() {
 it_is_skipped_with_failing_test() {
     assume test -z "bla"
 }
+
+it_shows_stdout_on_verbose() {
+    echo "Hello World"
+}

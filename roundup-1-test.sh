@@ -66,3 +66,11 @@ it_passes_if_init_before_test_after_cleanup_pass() {
     status=$(set +e ; rup roundup-succeeds >/dev/null ; echo $?)
     test 0 -eq $status
 }
+
+it_shows_stdout_on_verbose() {
+    rup --verbose roundup-5 | grep "Hello World"
+}
+
+it_hides_stdout_without_verbose() {
+    rup roundup-5 | grep -v "Hello World"
+}

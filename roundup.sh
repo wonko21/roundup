@@ -41,12 +41,13 @@ export ROUNDUP_VERSION
 # Usage is defined in a specific comment syntax. It is `grep`ed out of this file
 # when needed (i.e. The Tomayko Method).  See
 # [shocco](http://rtomayko.heroku.com/shocco) for more detail.
-#/ usage: roundup [--help|-h] [--version|-v] [plan ...]
+#/ usage: roundup [--help|-h] [--version|-v] [--verbose] [plan ...]
 
 roundup_usage() {
     grep '^#/' <"$0" | cut -c4-
 }
 
+verbose_fd=/dev/null
 while test "$#" -gt 0
 do
     case "$1" in
@@ -60,6 +61,11 @@ do
             ;;
         --color)
             color=always
+            shift
+            ;;
+        --verbose)
+	    verbose_fd=/dev/stdout
+            verbose=1
             shift
             ;;
         -)
@@ -157,28 +163,44 @@ roundup_summarize() {
     do
         case $status in
         p)
+            if [ "$previous_status" == "l" ]; then
+                printf '  `----------------------------------------------- '
+            fi
             ntests=$(expr $ntests + 1)
             passed=$(expr $passed + 1)
-            printf "  %-48s " "$name:"
             printf "$grn[PASS]$clr\n"
             ;;
         s)
+            if [ "$previous_status" == "l" ]; then
+                printf '  `----------------------------------------------- '
+            fi
             ntests=$(expr $ntests + 1)
             skipped=$(expr $skipped + 1)
-            printf "  %-48s " "$name:"
             printf "$ylw[SKIP]$clr\n"
             ;;
         f)
+            if [ "$previous_status" == "l" ]; then
+                printf '  `----------------------------------------------- '
+            fi
             ntests=$(expr $ntests + 1)
             failed=$(expr $failed + 1)
-            printf "  %-48s " "$name:"
             printf "$red[FAIL]$clr\n"
             roundup_trace < "$roundup_tmp/$name"
+            ;;
+        t)
+            printf "  %-48s " "$name:"
+            ;;
+        l)
+            if [ "$previous_status" == "t" ]; then
+                printf "\n"
+            fi
+            printf "  | %s\n" "$name"
             ;;
         d)
             printf "%s\n" "$name"
             ;;
         esac
+        previous_status="$status"
     done
     # __Test Summary__
     #
@@ -342,6 +364,7 @@ do
                 # Momentarily turn off auto-fail to give us access to the tests
                 # exit status in `$?` for capturing.
                 set +e
+                echo "t $roundup_test_name"
                 (
                     # Define a helper to log stdout to the file stdout and stderr to the
                     # file stderr. This can be used like this:
@@ -370,7 +393,7 @@ do
                     # tests trace output is saved in temporary storage.
                     set -xe
                     $roundup_test_name
-                ) >"$roundup_tmp/$roundup_test_name" 2>&1
+                ) 2>&1 | tee "$roundup_tmp/$roundup_test_name" | grep -v "^+" | sed 's/^/l /' >$verbose_fd
 
                 # We need to capture the exit status before returning the `set
                 # -e` mode.  Returning with `set -e` before we capture the exit
