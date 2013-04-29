@@ -240,7 +240,9 @@ run()
     # Check if `$func` was successful, otherwise emit fail signal
     if [ "$roundup_result" != 0 ]; then
         # `$func` failed
-        printf "f $func\n"; continue
+        echo "t $func"
+        echo "f $func"
+        continue
     fi
 }
 
@@ -329,6 +331,8 @@ do
             # exit status in `$?` for capturing.
             set +e
             (
+                echo "t $roundup_test_name"
+
                 # exit subshell with return code of last failing command. This
                 # is needed to see the return code 253 on failed assumptions.
                 # But, only do this if the error handling is activated.
@@ -342,7 +346,6 @@ do
                 # Momentarily turn off auto-fail to give us access to the tests
                 # exit status in `$?` for capturing.
                 set +e
-                echo "t $roundup_test_name"
                 (
                     # Define a helper to log stdout to the file stdout and stderr to the
                     # file stderr. This can be used like this:
