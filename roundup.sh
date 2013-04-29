@@ -41,7 +41,7 @@ export ROUNDUP_VERSION
 # Usage is defined in a specific comment syntax. It is `grep`ed out of this file
 # when needed (i.e. The Tomayko Method).  See
 # [shocco](http://rtomayko.heroku.com/shocco) for more detail.
-#/ usage: roundup [--help|-h] [--version|-v] [plan ...]
+#/ usage: roundup [--help|-h] [--version|-v] [--test TESTCASE] [plan ...]
 
 roundup_usage() {
     grep '^#/' <"$0" | cut -c4-
@@ -61,6 +61,10 @@ do
         --color)
             color=always
             shift
+            ;;
+        --test)
+            roundup_testcase=$2
+            shift 2
             ;;
         -)
             echo >&2 "roundup: unknown switch $1"
@@ -304,10 +308,14 @@ do
 
         # TODO:  I want to do this with sed only.  Please send a patch if you
         # know a cleaner way.
-        roundup_plan=$(
-            grep "^it_.*()" $roundup_p           |
-            sed "s/\(it_[a-zA-Z0-9_]*\).*$/\1/g"
-        )
+        if [ -n "$roundup_testcase" ]; then
+            roundup_plan="$roundup_testcase"
+        else
+            roundup_plan=$(
+                grep "^it_.*()" $roundup_p           |
+                sed "s/\(it_[a-zA-Z0-9_]*\).*$/\1/g"
+            )
+        fi
 
         # We have the test plan and are in our sandbox with [roundup(5)][r5]
         # defined.  Now we source the plan to bring its tests into scope.
