@@ -41,7 +41,7 @@ export ROUNDUP_VERSION
 # Usage is defined in a specific comment syntax. It is `grep`ed out of this file
 # when needed (i.e. The Tomayko Method).  See
 # [shocco](http://rtomayko.heroku.com/shocco) for more detail.
-#/ usage: roundup [--help|-h] [--version|-v] [--test TESTCASE] [plan ...]
+#/ usage: roundup [--help|-h] [--version|-v] [--debug|-d] [--test TESTCASE] [plan ...]
 
 roundup_usage() {
     grep '^#/' <"$0" | cut -c4-
@@ -65,6 +65,10 @@ do
         --test)
             roundup_testcase=$2
             shift 2
+            ;;
+        --debug|-d)
+            debug=1
+            shift
             ;;
         -)
             echo >&2 "roundup: unknown switch $1"
@@ -157,8 +161,23 @@ roundup_summarize() {
 
     : ${cols:=10}
 
+    prev_status=""
     while read status name
     do
+        case $status in
+        p|s|f)
+            if [ "$debug" == 1 ]; then
+                if [ "$prev_status" == l -a "$status" == f ]; then
+	            rc=$(sed 's/^.*rc=//' <<<"$second_last_trace_line")
+                    printf "\r    \`------------------------- exit code %-3s ---> %s " "$rc"
+                elif [ "$prev_status" == l -a "$status" == s ]; then
+                    printf "\r    \`-------------------------------------------> %s " ""
+	        else
+                    printf "\n    \`-------------------------------------------> %s " ""
+                fi
+            fi
+            ;;
+        esac
         case $status in
         p)
             ntests=$(expr $ntests + 1)
@@ -174,15 +193,23 @@ roundup_summarize() {
             ntests=$(expr $ntests + 1)
             failed=$(expr $failed + 1)
             printf "$red[FAIL]$clr\n"
-            roundup_trace < "$roundup_tmp/$name"
+            if [ "$debug" != 1 ]; then
+                roundup_trace < "$roundup_tmp/$name"
+            fi
             ;;
         t)
             printf "  %-48s " "$name:"
+            ;;
+        l)
+            printf "\n    %s" "$name"
+	    second_last_trace_line="$last_trace_line"
+	    last_trace_line="$name"
             ;;
         d)
             printf "%s\n" "$name"
             ;;
         esac
+        prev_status="$status"
     done
     # __Test Summary__
     #
@@ -250,6 +277,15 @@ run()
     fi
 }
 
+# in debug mode, print out the traces. Otherwise,
+# traces go to /dev/null
+if [ "$debug" == 1 ]; then
+    trace_device=/dev/stdout
+else
+    trace_device=/dev/null
+fi
+tee=$(which tee)
+sed=$(which sed)
 
 # Sandbox Test Runs
 # -----------------
@@ -322,7 +358,7 @@ do
         . ./$roundup_p
 
         # Output the description signal
-        printf "d %s" "$roundup_desc" | tr "\n" " "
+        printf "d %s\n" "$roundup_desc" | tr "\n" " "
         printf "\n"
 
         # Run `init` function of the current plan. THis will be done before any of
@@ -382,13 +418,13 @@ do
                     # tests trace output is saved in temporary storage.
                     set -xe
                     $roundup_test_name
-                ) >"$roundup_tmp/$roundup_test_name" 2>&1
+                ) 2>&1 | $tee "$roundup_tmp/$roundup_test_name" | $sed 's/^/l /' >$trace_device
 
                 # We need to capture the exit status before returning the `set
                 # -e` mode.  Returning with `set -e` before we capture the exit
-                # status will result in `$?` being set with `set`'s status
+                # status will result in `${PIPESTATUS[0]}` being set with `set`'s status
                 # instead.
-                roundup_result=$?
+                roundup_result=${PIPESTATUS[0]}
 
                 # If `after` wasn't redefined, then this runs `:`.
                 after
