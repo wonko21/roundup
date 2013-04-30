@@ -382,7 +382,6 @@ do
                 # But, only do this if the error handling is activated.
                 set -E
                 trap 'rc=$?; set +x; set -o | grep "errexit.*on" >/dev/null && exit $rc' ERR
-                trap "cleanup" INT
 
                 # If `before` wasn't redefined, then this is `:`.
                 run_with_tracing before "$roundup_tmp/$roundup_test_name"
