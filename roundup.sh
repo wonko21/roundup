@@ -245,6 +245,15 @@ run_with_tracing()
     } &>/dev/null
 }
 
+start_error_handling ()
+{
+        # exit subshell with return code of last failing command. This
+        # is needed to see the return code 253 on failed assumptions.
+        # But, only do this if the error handling is activated.
+        set -E
+        trap 'rc=$?; set +x; set -o | grep "errexit.*on" >/dev/null && exit $rc' ERR
+}
+
 run()
 {
     local func="$1"
@@ -256,12 +265,7 @@ run()
     # in `$?` for capturing.
     set +e
     (
-        # exit subshell with return code of last failing command. This
-        # is needed to see the return code 253 on failed assumptions.
-        # But, only do this if the error handling is activated.
-        set -E
-        trap 'rc=$?; set +x; set -o | grep "errexit.*on" >/dev/null && exit $rc' ERR
-
+        start_error_handling
         run_with_tracing "$func"
     )
 
@@ -377,11 +381,8 @@ do
             (
                 echo "t $roundup_test_name"
 
-                # exit subshell with return code of last failing command. This
-                # is needed to see the return code 253 on failed assumptions.
-                # But, only do this if the error handling is activated.
-                set -E
-                trap 'rc=$?; set +x; set -o | grep "errexit.*on" >/dev/null && exit $rc' ERR
+                # start bash error handling
+                start_error_handling
 
                 # If `before` wasn't redefined, then this is `:`.
                 run_with_tracing before "$roundup_tmp/$roundup_test_name"
