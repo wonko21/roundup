@@ -226,37 +226,55 @@ roundup_summarize() {
     test $failed -eq 0 || exit 2
 }
 
-
 run_with_tracing()
 {
-    local func="$1"
-    local tracefile="${2:-$roundup_tmp/$func}"
-
-    # Output `$func` trace to temporary file.
+    exec 4>&1
     {
-        # redirect tracing output of `$func` into file.
         {
+            # Set `-xe` before the test in the subshell.  We want the
+            # test to fail fast to allow for more accurate output of
+            # where things went wrong but not in _our_ process because a
+            # failed test should not immediately fail roundup.  Each
+            # tests trace output is saved in temporary storage.
             set -xe
-            $func
-        } &>"$tracefile"
-
-         # disable tracing again. Its trace output goes to /dev/null.
+            "$1"
+        } 1>&4 2>&4
+        local rc=$?
         set +x
     } &>/dev/null
+    exec 4>&-
+    return $rc
 }
 
 start_error_handling ()
 {
-        # exit subshell with return code of last failing command. This
-        # is needed to see the return code 253 on failed assumptions.
-        # But, only do this if the error handling is activated.
-        set -E
-        trap 'rc=$?; set +x; set -o | grep "errexit.*on" >/dev/null && exit $rc' ERR
+    # exit subshell with return code of last failing command. This
+    # is needed to see the return code 253 on failed assumptions.
+    # But, only do this if the error handling is activated.
+    set -E
+    trap 'rc=$?; set +x; set -o | grep "errexit.*on" >/dev/null && exit $rc' ERR
+}
+
+print_result ()
+{
+    if [ "$2" == 0 ]
+    then printf "p"; eval export passed_$1=1
+    elif [ "$2" == 253 ]
+    then printf "s"
+    else printf "f"
+    fi
+
+    printf " $1\n"
 }
 
 run()
 {
     local func="$1"
+
+    # show title
+    if [ "$debug" == 1 ]; then
+        printf "t $func\n"
+    fi
 
     # Any number of things are possible in `$func`.
     # Drop into an subshell to contain operations that may throw
@@ -267,17 +285,19 @@ run()
     (
         start_error_handling
         run_with_tracing "$func"
-    )
-
-    # copy roundup_result from subshell above
-    roundup_result=$?
+    ) | $tee "$roundup_tmp/$func" | $sed 's/^/l /' >$trace_device
+    roundup_result=${PIPESTATUS[0]}
+    set -e
 
     # Check if `$func` was successful, otherwise emit fail signal
-    if [ "$roundup_result" != 0 ]; then
-        # `$func` failed
-        echo "t $func"
-        echo "f $func"
-        continue
+    if [ "$roundup_result" != 0 -o "$debug" == 1 ]; then
+        if [ "$debug" != 1 ]; then
+             printf "t $func\n"
+        fi
+        print_result "$func" "$roundup_result"
+        if [ "$roundup_result" != 0 ]; then
+             continue
+        fi
     fi
 }
 
@@ -372,6 +392,8 @@ do
 
         for roundup_test_name in $roundup_plan
         do
+            echo "t $roundup_test_name"
+
             # Any number of things are possible in `before`, `after`, and the
             # test.  Drop into an subshell to contain operations that may throw
             # off roundup; such as `cd`.
@@ -379,76 +401,56 @@ do
             # exit status in `$?` for capturing.
             set +e
             (
-                echo "t $roundup_test_name"
-
                 # start bash error handling
                 start_error_handling
 
                 # If `before` wasn't redefined, then this is `:`.
-                run_with_tracing before "$roundup_tmp/$roundup_test_name"
+                run_with_tracing before
 
-                # Momentarily turn off auto-fail to give us access to the tests
-                # exit status in `$?` for capturing.
-                set +e
-                (
-                    # Define a helper to log stdout to the file stdout and stderr to the
-                    # file stderr. This can be used like this:
-                    #   capture ls asdf
-                    #   grep "error" stderr
-                    capture () {
-                        {
-                            "$@" 2>&1 1>&3 | tee -- $roundup_tmp/stderr | awk "{ print \"\033[31m\"\$0\"\033[m\"; }" 1>&2
-                            return ${PIPESTATUS[0]};
-                        } 3>&1 | tee -- $roundup_tmp/stdout
-                        return ${PIPESTATUS[0]}
-                    }
+                # Define a helper to log stdout to the file stdout and stderr to the
+                # file stderr. This can be used like this:
+                #   capture ls asdf
+                #   grep "error" stderr
+                capture () {
+                    {
+                         "$@" 2>&1 1>&3 | tee -- $roundup_tmp/stderr | awk "{ print \"\033[31m\"\$0\"\033[m\"; }" 1>&2
+                         return ${PIPESTATUS[0]};
+                    } 3>&1 | tee -- $roundup_tmp/stdout
+                    return ${PIPESTATUS[0]}
+                }
 
-                    stdout () { echo -n "$roundup_tmp/stdout"; }
-                    stderr () { echo -n "$roundup_tmp/stderr"; }
+                stdout () { echo -n "$roundup_tmp/stdout"; }
+                stderr () { echo -n "$roundup_tmp/stderr"; }
 
+                # Define a negating operator which triggers the error trap of the shell. The
+                # builtin ! will not.
+                function expectfail () { ! "$@"; }
 
-                    # Define a negating operator which triggers the error trap of the shell. The
-                    # builtin ! will not.
-                    function expectfail () { ! "$@"; }
-
-                    # Set `-xe` before the test in the subshell.  We want the
-                    # test to fail fast to allow for more accurate output of
-                    # where things went wrong but not in _our_ process because a
-                    # failed test should not immediately fail roundup.  Each
-                    # tests trace output is saved in temporary storage.
-                    set -xe
-                    $roundup_test_name
-                ) 2>&1 | $tee "$roundup_tmp/$roundup_test_name" | $sed 's/^/l /' >$trace_device
+		# run test
+		( run_with_tracing "$roundup_test_name" )
 
                 # We need to capture the exit status before returning the `set
                 # -e` mode.  Returning with `set -e` before we capture the exit
                 # status will result in `${PIPESTATUS[0]}` being set with `set`'s status
                 # instead.
-                roundup_result=${PIPESTATUS[0]}
+                roundup_result=$?
 
                 # If `after` wasn't redefined, then this runs `:`.
                 after
 
                 # Pass roundup return code outside of the subshell
                 exit $roundup_result
-            )
+            ) | $tee "$roundup_tmp/$roundup_test_name" | $sed 's/^/l /' >$trace_device
 
             # copy roundup_result from subshell above
-            roundup_result=$?
+            roundup_result=${PIPESTATUS[0]}
 
             # It's safe to return to normal operation.
             set -e
 
             # This is the final step of a test.  Print its pass/fail signal
             # and name.
-            if [ "$roundup_result" == 0 ]
-            then printf "p"; eval export passed_$roundup_test_name=1
-            elif [ "$roundup_result" == 253 ]
-            then printf "s"
-            else printf "f"
-            fi
-
-            printf " $roundup_test_name\n"
+            print_result "$roundup_test_name" "$roundup_result"
         done
 
         # Run `cleanup` function of the current plan.
