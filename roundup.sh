@@ -416,11 +416,14 @@ do
                          "$@" 2>&1 1>&3 | tee -- $roundup_tmp/stderr | awk "{ print \"\033[31m\"\$0\"\033[m\"; }" 1>&2
                          return ${PIPESTATUS[0]};
                     } 3>&1 | tee -- $roundup_tmp/stdout
-                    return ${PIPESTATUS[0]}
+                    ret=${PIPESTATUS[0]}
+                    echo "$ret" > $roundup_tmp/rc
+                    return $ret
                 }
 
                 stdout () { echo -n "$roundup_tmp/stdout"; }
                 stderr () { echo -n "$roundup_tmp/stderr"; }
+                rc ()     { echo -n "$roundup_tmp/rc"; }
 
                 # Define a negating operator which triggers the error trap of the shell. The
                 # builtin ! will not.
