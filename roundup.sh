@@ -424,6 +424,7 @@ do
                 function expectfail () { ! "$@"; }
 
 		# run test
+		set +e
 		( run_with_tracing "$roundup_test_name" )
 
                 # We need to capture the exit status before returning the `set
@@ -433,7 +434,14 @@ do
                 roundup_result=$?
 
                 # If `after` wasn't redefined, then this runs `:`.
-                after
+		if [ "$roundup_result" == 0 ]; then
+			# run after function with tracing to catch errors
+			( run_with_tracing "after" )
+			roundup_result=$?
+		else
+			# run after function without tracing, maybe it can cleanup something
+			after
+		fi
 
                 # Pass roundup return code outside of the subshell
                 exit $roundup_result
