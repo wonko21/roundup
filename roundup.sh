@@ -98,17 +98,11 @@ trap "rm -rf \"$roundup_tmp\"" EXIT INT
 
 # __Tracing failures__
 roundup_trace() {
-    # Delete the first two lines that represent roundups execution of the
-    # test function.  They are useless to the user.
-    sed '1d'                                   |
     # Delete the last line which is the "set +x" of the error trap
     sed '$d'                                   |
     # Replace the rc=$? of the error trap with an verbose string appended
     # to the failing command trace line.
     sed '$s/.*rc=/exit code /'                 |
-    # Trim the two left most `+` signs.  They represent the depth at which
-    # roundup executed the function.  They also, are useless and confusing.
-    sed 's/^++//'                              |
     # Indent the output by 4 spaces to align under the test name in the
     # summary.
     sed 's/^/    /'                            |
