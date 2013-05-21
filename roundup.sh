@@ -398,6 +398,9 @@ do
                 # start bash error handling
                 start_error_handling
 
+                # run after method in any case
+                trap 'rc=$?; set +x; if [ "$rc" == 0 ]; then run_with_tracing after; else set +xe; after; exit $rc; fi' EXIT
+
                 # If `before` wasn't redefined, then this is `:`.
                 run_with_tracing before
 
@@ -423,28 +426,8 @@ do
                 # builtin ! will not.
                 function expectfail () { ! "$@"; }
 
-		# run test
-		set +e
-		( run_with_tracing "$roundup_test_name" )
-
-                # We need to capture the exit status before returning the `set
-                # -e` mode.  Returning with `set -e` before we capture the exit
-                # status will result in `${PIPESTATUS[0]}` being set with `set`'s status
-                # instead.
-                roundup_result=$?
-
-                # If `after` wasn't redefined, then this runs `:`.
-		if [ "$roundup_result" == 0 ]; then
-			# run after function with tracing to catch errors
-			( run_with_tracing "after" )
-			roundup_result=$?
-		else
-			# run after function without tracing, maybe it can cleanup something
-			after
-		fi
-
-                # Pass roundup return code outside of the subshell
-                exit $roundup_result
+                # run test
+                run_with_tracing "$roundup_test_name"
             ) | $tee "$roundup_tmp/$roundup_test_name" | $sed 's/^/l /' >$trace_device
 
             # copy roundup_result from subshell above
