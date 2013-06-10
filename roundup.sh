@@ -409,6 +409,10 @@ do
                 #   capture ls asdf
                 #   grep "error" stderr
                 capture () {
+                    # resetting the output buffers before capturing. This should
+                    # guarantee that old data has been erases when running
+                    # capture multiple times during a test
+                    truncate -s 0 $roundup_tmp/{stdout,stderr,rc}
                     {
                          "$@" 2>&1 1>&3 | tee -- $roundup_tmp/stderr | awk "{ print \"\033[31m\"\$0\"\033[m\"; }" 1>&2
                          return ${PIPESTATUS[0]};
@@ -418,9 +422,12 @@ do
                     return $ret
                 }
 
+                # defining helper functions and resetting the output buffers
+                # before running the next test
                 stdout () { echo -n "$roundup_tmp/stdout"; }
                 stderr () { echo -n "$roundup_tmp/stderr"; }
                 rc ()     { echo -n "$roundup_tmp/rc"; }
+                truncate -s 0 $roundup_tmp/{stdout,stderr,rc}
 
                 # Define a negating operator which triggers the error trap of the shell. The
                 # builtin ! will not.
