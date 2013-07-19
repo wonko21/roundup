@@ -66,3 +66,10 @@ it_passes_if_init_before_test_after_cleanup_pass() {
     status=$(set +e ; rup roundup-succeeds >/dev/null ; echo $?)
     test 0 -eq $status
 }
+
+# Find the current location of this plan file
+it_locates_its_absolute_path_location()
+{
+    PWD=$(pwd)
+    test "$(roundup_pwd)" == "$PWD"
+}

@@ -127,3 +127,10 @@ it_is_skipped_without_assumptions() {
 it_is_skipped_with_failing_test() {
     assume test -z "bla"
 }
+
+# Find the current location of this plan file
+it_locates_its_absolute_path_location()
+{
+    PWD=$(pwd)
+    test "$(roundup_pwd)" == "s$PWD"
+}

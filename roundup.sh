@@ -319,6 +319,10 @@ do
     # Create a sandbox, source the test plan, run the tests, then leave
     # without a trace.
     (
+        # Enable the plan to locate it's current position in the filesystem
+        roundup_pwd() {
+            readlink -f $(dirname $roundup_p)
+        }
         # Consider the description to be the `basename` of the plan minus the
         # tailing -test.sh.
         roundup_desc=$(basename "$roundup_p" -test.sh)
