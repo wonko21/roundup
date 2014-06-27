@@ -38,13 +38,16 @@ set -e
 ROUNDUP_VERSION="0.0.5"
 export ROUNDUP_VERSION
 
-# Usage is defined in a specific comment syntax. It is `grep`ed out of this file
+GREP='/usr/bin/grep'
+TRUNCATE='/usr/bin/truncate'
+
+# Usage is defined in a specific comment syntax. It is `$GREP`ed out of this file
 # when needed (i.e. The Tomayko Method).  See
 # [shocco](http://rtomayko.heroku.com/shocco) for more detail.
 #/ usage: roundup [--help|-h] [--version|-v] [--debug|-d] [--test TESTCASE] [plan ...]
 
 roundup_usage() {
-    grep '^#/' <"$0" | cut -c4-
+    $GREP '^#/' <"$0" | cut -c4-
 }
 
 while test "$#" -gt 0
@@ -246,7 +249,7 @@ start_error_handling ()
     # is needed to see the return code 253 on failed assumptions.
     # But, only do this if the error handling is activated.
     set -E
-    trap 'rc=$?; set +x; set -o | grep "errexit.*on" >/dev/null && exit $rc' ERR
+    trap 'rc=$?; set +x; set -o | $GREP "errexit.*on" >/dev/null && exit $rc' ERR
 }
 
 print_result ()
@@ -337,7 +340,7 @@ do
         #   ./binary
         # }
         assume() {
-            if (echo "$1" | grep "^it_.*" >/dev/null)
+            if (echo "$1" | $GREP "^it_.*" >/dev/null)
             then if [ "$(eval echo \${passed_$1})" == 1 ]
                  then return 0
                  else return 253
@@ -366,7 +369,7 @@ do
             roundup_plan="$roundup_testcase"
         else
             roundup_plan=$(
-                grep "^it_.*()" $roundup_p           |
+                $GREP "^it_.*()" $roundup_p           |
                 sed "s/\(it_[a-zA-Z0-9_]*\).*$/\1/g"
             )
         fi
@@ -407,12 +410,12 @@ do
                 # Define a helper to log stdout to the file stdout and stderr to the
                 # file stderr. This can be used like this:
                 #   capture ls asdf
-                #   grep "error" stderr
+                #   $GREP "error" stderr
                 capture () {
                     # resetting the output buffers before capturing. This should
                     # guarantee that old data has been erases when running
                     # capture multiple times during a test
-                    truncate -s 0 $roundup_tmp/{stdout,stderr,rc}
+                    $TRUNCATE -s 0 $roundup_tmp/{stdout,stderr,rc}
                     {
                          "$@" 2>&1 1>&3 | tee -- $roundup_tmp/stderr | awk "{ print \"\033[31m\"\$0\"\033[m\"; }" 1>&2
                          return ${PIPESTATUS[0]};
@@ -427,7 +430,8 @@ do
                 stdout () { echo -n "$roundup_tmp/stdout"; }
                 stderr () { echo -n "$roundup_tmp/stderr"; }
                 rc ()     { echo -n "$roundup_tmp/rc"; }
-                truncate -s 0 $roundup_tmp/{stdout,stderr,rc}
+                echo "debug $roundup_tmp/{stdout,stderr,rc}"
+                $TRUNCATE -s 0 $roundup_tmp/{stdout,stderr,rc}
 
                 # Define a negating operator which triggers the error trap of the shell. The
                 # builtin ! will not.
