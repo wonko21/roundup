@@ -178,7 +178,7 @@ roundup_summarize() {
         esac
         case $status in
         c)
-	    ctests=$name
+	    ctests=$(expr $ctests + $name)
 	    ;;
         p)
             ntests=$(expr $ntests + 1)
