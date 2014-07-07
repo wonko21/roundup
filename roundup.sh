@@ -151,6 +151,7 @@ roundup_summarize() {
     # Make these available to `roundup_trace`.
     export red grn mag clr ylw
 
+    ctests=0
     ntests=0
     passed=0
     skipped=0
@@ -176,6 +177,9 @@ roundup_summarize() {
             ;;
         esac
         case $status in
+        c)
+	    ctests=$name
+	    ;;
         p)
             ntests=$(expr $ntests + 1)
             passed=$(expr $passed + 1)
@@ -208,12 +212,20 @@ roundup_summarize() {
         esac
         prev_status="$status"
     done
+
+    # check if the right amount of tests where executed
+    if [ "$ctests" != "$ntests" ]; then
+        printf "  %-48s " "Missing Tests:"
+        printf "$red[FAIL]$clr\n"
+        failed=$(expr $failed + \( $ctests - $ntests \))
+    fi
+
     # __Test Summary__
     #
     # Display the summary now that all tests are finished.
     yes = | head -n 57 | tr -d '\n'
     printf "\n"
-    printf "Tests:   %3d | " $ntests
+    printf "Tests:   %3d | " $ctests
     printf "Passed:  %3d | " $passed
     printf "Skipped: %3d | " $skipped
     printf "Failed:  %3d"    $failed
@@ -378,6 +390,9 @@ do
             )
         fi
 
+        numtests=$(echo "$roundup_plan"|wc -w)
+        printf "c $numtests \n"
+
         # We have the test plan and are in our sandbox with [roundup(5)][r5]
         # defined.  Now we source the plan to bring its tests into scope.
         . ./$roundup_p
@@ -390,6 +405,8 @@ do
         # the tests in the plan are executed.
         # If `init` wasn't redefined, then this is `:`.
         run "init"
+
+
 
         for roundup_test_name in $roundup_plan
         do
